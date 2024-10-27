@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -28,72 +27,22 @@ import (
 )
 
 const (
-	INFURA       = "https://mainnet.infura.io/v3/8f55e3b466dc48da85e06b50177c4c0b"
-	hexChars     = "0123456789abcdef"
-	workersCount = 10 // количество воркеров
+	INFURA = "https://mainnet.infura.io/v3/8f55e3b466dc48da85e06b50177c4c0b"
 )
-
-var (
-	baseString = "0a5c2dffb9a6e1240e7d8f58b1e68d6c9fce1e6e9b0a5c0e7f1b2c3a4b5"
-)
-
-// Генерация всех возможных комбинаций из 5 символов
-func generateCombinations(prefix string, length int, result chan<- string, wg *sync.WaitGroup, sem chan struct{}) {
-	defer wg.Done()
-	if length == 0 {
-		result <- prefix
-		return
-	}
-	for _, c := range hexChars {
-		sem <- struct{}{}
-		wg.Add(1)
-		go generateCombinations(prefix+string(c), length-1, result, wg, sem)
-		<-sem
-	}
-}
 
 func main() {
-	// combinations := make(chan string)
-	// var wg sync.WaitGroup
-	// sem := make(chan struct{}, workersCount)
-
-	// // Запуск воркера для обработки комбинаций
-	// go func() {
-	// 	for combo := range combinations {
-	// 		for i := 0; i <= len(baseString); i++ {
-	// 			// Добавляем недостающие символы перед строкой
-	// 			if i == 0 {
-	// 				priv := combo + baseString
-	// 				fmt.Println(strings.ToLower(priv + "=" + addressFromPrivate(priv)))
-	// 			}
-	// 			// Добавляем недостающие символы после строки
-	// 			if i == len(baseString) {
-	// 				priv := baseString + combo
-	// 				fmt.Println(strings.ToLower(priv + "=" + addressFromPrivate(priv)))
-	// 			}
-	// 		}
-	// 	}
-	// }()
-
-	// // Инициализация генерации комбинаций
-	// wg.Add(1)
-	// go generateCombinations("", 5, combinations, &wg, sem)
-
-	// // Ожидаем завершения всех горутин
-	// wg.Wait()
-	// close(combinations)
-
 	wrk := func(_ int, jobs <-chan string, results chan<- string) {
-		for address := range jobs {
-			result := fmt.Sprintf("%s=%s", address, getTokens([]string{address}))
+		for private := range jobs {
+			result := fmt.Sprintf("%s;0x%s", private, addressFromPrivate(private))
 			results <- result
 		}
 	}
 
-	full := parseCombinations("storage/combinations.txt")
+	full := parseCombinations("storage/ruby_input.txt")
+	fmt.Println("private_key;address")
 
 	start := 0
-	len := 100000
+	len := len(full)
 
 	addresses := full[start : start+len]
 
@@ -128,13 +77,7 @@ func parseCombinations(filename string) []string {
 
 	for scanner.Scan() {
 		text := scanner.Text()
-
-		parts := strings.Split(text, "=")
-		if len(parts) < 2 {
-			continue
-		}
-
-		addresses = append(addresses, strings.Trim(parts[1], " "))
+		addresses = append(addresses, strings.Trim(text, " "))
 	}
 
 	return addresses
